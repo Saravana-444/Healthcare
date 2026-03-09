@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>VYNOX — AI Medication Safety</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+/* ═══ VARIABLES ═══ */
+:root {
+  --bg:        #04111f;
+  --surface:   #071a2e;
+  --surface2:  #0a2340;
+  --border:    rgba(0,200,180,0.15);
+  --teal:      #00c8b4;
+  --teal-dim:  rgba(0,200,180,0.08);
+  --teal-glow: rgba(0,200,180,0.25);
+  --orange:    #fb923c;
+  --red:       #ef4444;
+  --green:     #22c55e;
+  --text:      #e2f0ff;
+  --text-dim:  #7a9bb8;
+  --font-head: 'Rajdhani', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+/* ═══ RESET ═══ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+/* ═══ LAYOUT ═══ */
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ═══ HEADER ═══ */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.logo {
+  font-family: var(--font-head);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--teal);
+}
+.logo span { color: var(--text-dim); font-size: 11px; letter-spacing: 2px; display: block; margin-top: -4px; }
+.header-stats { display: flex; gap: 16px; }
+.hstat { text-align: center; }
+.hstat-num { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--teal); line-height: 1; }
+.hstat-lbl { font-size: 9px; letter-spacing: 1px; color: var(--text-dim); text-transform: uppercase; }
+
+/* ═══ NAV TABS ═══ */
+.nav {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.nav-btn {
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-head);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.nav-btn.active { color: var(--teal); border-bottom-color: var(--teal); }
+.nav-btn:hover:not(.active) { color: var(--text); }
+
+/* ═══ SCREENS ═══ */
+.screens { flex: 1; overflow: hidden; position: relative; }
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: none;
+  animation: fadeIn 0.25s ease;
+}
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ═══ CARDS ═══ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-family: var(--font-head);
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--teal);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.card-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
+
+/* ═══ SCANNER ═══ */
+#scanner-box {
+  background: var(--surface2);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#scanner-box.scanning { border-color: var(--teal); border-style: solid; }
+#qr-reader { width: 100%; }
+#qr-reader video { border-radius: 10px; }
+.scan-placeholder {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+}
+.scan-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+.scan-placeholder p { font-size: 13px; line-height: 1.6; }
+
+.scan-controls { display: flex; gap: 10px; margin-top: 12px; }
+
+/* ═══ SEARCH ═══ */
+.search-wrap { position: relative; margin-bottom: 16px; }
+.search-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px 12px 40px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-input:focus { border-color: var(--teal); }
+.search-input::placeholder { color: var(--text-dim); }
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 16px;
+  pointer-events: none;
+}
+.search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  z-index: 100;
+  max-height: 260px;
+  overflow-y: auto;
+  display: none;
+}
+.search-results.show { display: block; }
+.search-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.search-item:last-child { border-bottom: none; }
+.search-item:hover { background: var(--teal-dim); }
+.search-item-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.search-item-use { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* ═══ MEDICINE PILLS ═══ */
+.pills-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.pill {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+.pill:hover { border-color: var(--teal); background: var(--teal-dim); }
+.pill-name { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.pill-brand { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+/* ═══ NOT FOUND BOX ═══ */
+.not-found-box {
+  background: rgba(251,146,60,0.08);
+  border: 1px solid rgba(251,146,60,0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 12px;
+  display: none;
+}
+.not-found-box.show { display: block; }
+.not-found-title { font-family: var(--font-head); color: var(--orange); font-size: 14px; letter-spacing: 1px; margin-bottom: 6px; }
+.not-found-val { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.submit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ═══ BUTTONS ═══ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.btn-primary { background: var(--teal); color: var(--bg); }
+.btn-primary:hover { background: #00e0c8; transform: translateY(-1px); }
+.btn-outline { background: transparent; border: 1px solid var(--teal); color: var(--teal); }
+.btn-outline:hover { background: var(--teal-dim); }
+.btn-danger { background: var(--red); color: white; }
+.btn-sm { padding: 7px 14px; font-size: 12px; }
+.btn-full { width: 100%; justify-content: center; }
+
+/* ═══ LOADING ═══ */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4,17,31,0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  flex-direction: column;
+  gap: 16px;
+}
+.loading-overlay.show { display: flex; }
+.spinner {
+  width: 44px; height: 44px;
+  border: 3px solid var(--border);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: var(--font-head); color: var(--teal); letter-spacing: 2px; font-size: 13px; }
+
+/* ═══ MEDICINE DETAILS ═══ */
+.detail-header {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.detail-header::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 120px; height: 120px;
+  background: var(--teal-glow);
+  border-radius: 50%;
+  filter: blur(40px);
+}
+.detail-name {
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--teal);
+  letter-spacing: 1px;
+  line-height: 1.2;
+}
+.detail-brand { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.detail-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.badge-teal { background: var(--teal-dim); border: 1px solid var(--teal); color: var(--teal); }
+.badge-orange { background: rgba(251,146,60,0.1); border: 1px solid var(--orange); color: var(--orange); }
+.badge-green { background: rgba(34,197,94,0.1); border: 1px solid var(--green); color: var(--green); }
+.confidence-bar {
+  margin-top: 14px;
+  background: var(--surface2);
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+}
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), #00e0c8);
+  border-radius: 4px;
+  transition: width 0.8s ease;
+}
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.info-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.info-box-label { font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
+.info-box-value { font-size: 13px; color: var(--text); line-height: 1.4; }
+
+.warning-box {
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.warning-title { font-family: var(--font-head); color: var(--red); font-size: 13px; letter-spacing: 1px; margin-bottom: 6px; }
+.warning-text { font-size: 13px; color: var(--text); line-height: 1.6; }
+
+/* ═══ INTERACTIONS ═══ */
+.interaction-list { display: flex; flex-direction: column; gap: 8px; }
+.interaction-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.interaction-item:hover { border-color: var(--teal); }
+.interaction-item.selected { border-color: var(--teal); background: var(--teal-dim); }
+.interaction-check {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+.interaction-item.selected .interaction-check {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--bg);
+}
+.interaction-med-name { font-size: 13px; font-weight: 600; }
+.interaction-med-use { font-size: 11px; color: var(--text-dim); }
+
+.result-box {
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 14px;
+  display: none;
+}
+.result-box.show { display: block; }
+.result-box.safe { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3); }
+.result-box.warn { background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.3); }
+.result-box.danger { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.35); }
+.result-level { font-family: var(--font-head); font-size: 14px; letter-spacing: 1px; margin-bottom: 6px; }
+.result-level.safe { color: var(--green); }
+.result-level.warn { color: var(--orange); }
+.result-level.danger { color: var(--red); }
+.result-message { font-size: 13px; line-height: 1.6; }
+
+/* ═══ VOICE ═══ */
+.lang-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin: 14px 0; }
+.lang-btn {
+  padding: 12px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+.lang-btn:hover, .lang-btn.active { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+.lang-native { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.voice-preview {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.7;
+  margin-bottom: 14px;
+  min-height: 60px;
+}
+.speaking-indicator {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  color: var(--teal);
+  font-family: var(--font-head);
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-top: 10px;
+}
+.speaking-indicator.on { display: flex; }
+.speaking-dot {
+  width: 8px; height: 8px;
+  background: var(--teal);
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+
+/* ═══ GUARDIAN ═══ */
+.input-group { margin-bottom: 12px; }
+.input-label { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.med-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 14px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.med-input:focus { border-color: var(--teal); }
+.med-input::placeholder { color: var(--text-dim); }
+
+/* ═══ DASHBOARD ═══ */
+.stats-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 16px; }
+.stat-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.stat-num { font-family: var(--font-head); font-size: 28px; font-weight: 700; color: var(--teal); line-height: 1; }
+.stat-lbl { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+.history-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.history-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.history-meta { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+.history-time { font-size: 10px; color: var(--text-dim); text-align: right; }
+
+/* ═══ TOAST ═══ */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface2);
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 13px;
+  color: var(--text);
+  z-index: 9999;
+  transition: transform 0.3s ease;
+  white-space: nowrap;
+  max-width: 90vw;
+  text-align: center;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ═══ QR GENERATOR ═══ */
+.qr-gen-output {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.qr-item {
+  background: white;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+.qr-item p { font-size: 10px; color: #333; margin-top: 6px; font-family: sans-serif; }
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 400px) {
+  .info-grid { grid-template-columns: 1fr; }
+  .lang-grid { grid-template-columns: repeat(2,1fr); }
+  .pills-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">VYNOX <span>AI MEDICATION SAFETY</span></div>
+    <div class="header-stats">
+      <div class="hstat"><div class="hstat-num" id="hstatScans">0</div><div class="hstat-lbl">Scans</div></div>
+      <div class="hstat"><div class="hstat-num" id="hstatMeds">20</div><div class="hstat-lbl">Medicines</div></div>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="nav-btn active" onclick="goTab('scan')">📷 Scan</button>
+    <button class="nav-btn" onclick="goTab('details')" id="navDetails">💊 Details</button>
+    <button class="nav-btn" onclick="goTab('interact')">⚡ Check</button>
+    <button class="nav-btn" onclick="goTab('voice')">🔊 Voice</button>
+    <button class="nav-btn" onclick="goTab('guardian')">🛡️ Alert</button>
+    <button class="nav-btn" onclick="goTab('dashboard')">📊 History</button>
+  </div>
+
+  <!-- SCREENS -->
+  <div class="screens">
+
+    <!-- ═══ SCAN SCREEN ═══ -->
+    <div class="screen active" id="screen-scan">
+      <div class="card">
+        <div class="card-title">Scan Medicine</div>
+        <div class="card-sub">Scan a QR code or search by medicine name</div>
+
+        <!-- Search -->
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="searchInput"
+            placeholder="Type medicine name... e.g. Crocin, Dolo, Aspirin"
+            oninput="onSearch(this.value)"
+            onblur="setTimeout(()=>hideSearch(),200)"/>
+          <div class="search-results" id="searchResults"></div>
+        </div>
+
+        <!-- Scanner Box -->
+        <div id="scanner-box">
+          <div class="scan-placeholder" id="scanPlaceholder">
+            <div class="scan-icon">📷</div>
+            <p>Camera will appear here<br/>Press START to begin scanning</p>
+          </div>
+          <div id="qr-reader"></div>
+        </div>
+
+        <!-- Scan Controls -->
+        <div class="scan-controls" style="margin-top:12px;">
+          <button class="btn btn-primary btn-sm" onclick="startScanner()" id="btnStart">▶ Start Camera</button>
+          <button class="btn btn-outline btn-sm" onclick="stopScanner()" id="btnStop" style="display:none;">⏹ Stop</button>
+        </div>
+
+        <!-- Not Found Box -->
+        <div class="not-found-box" id="notFoundBox">
+          <div class="not-found-title">⚠️ Medicine Not Found</div>
+          <div class="not-found-val">Scanned: <strong id="scannedVal"></strong></div>
+          <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+            Help others — add this medicine to the community database:
+          </p>
+          <div class="submit-grid">
+            <input class="med-input" id="subName" placeholder="Medicine name *" style="font-size:12px;padding:8px 10px;"/>
+            <input class="med-input" id="subBrand" placeholder="Brand name" style="font-size:12px;padding:8px 10px;"/>
+            <input class="med-input" id="subUse" placeholder="Used for" style="font-size:12px;padding:8px 10px;"/>
+            <input class="med-input" id="subDose" placeholder="Dosage" style="font-size:12px;padding:8px 10px;"/>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="submitUnknown()">
+            ➕ Add to Database
+          </button>
+        </div>
+      </div>
+
+      <!-- Medicine Buttons -->
+      <div class="card">
+        <div class="card-title">Quick Select</div>
+        <div class="card-sub">Tap any medicine to see details instantly</div>
+        <div class="pills-grid" id="pillsGrid"></div>
+      </div>
+
+      <!-- QR Generator -->
+      <div class="card">
+        <div class="card-title">Generate Test QR Codes</div>
+        <div class="card-sub">Generate QR codes to test scanning</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="genQRCodes()">🔲 Generate All QR Codes</button>
+        </div>
+        <div class="qr-gen-output" id="qrOutput"></div>
+      </div>
+    </div>
+
+    <!-- ═══ DETAILS SCREEN ═══ -->
+    <div class="screen" id="screen-details">
+      <div id="detailsContent">
+        <div style="text-align:center;padding:60px 20px;color:var(--text-dim);">
+          <div style="font-size:48px;margin-bottom:16px;">💊</div>
+          <p>Scan a QR code or select a medicine<br/>to see full details here</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ INTERACTION CHECK SCREEN ═══ -->
+    <div class="screen" id="screen-interact">
+      <div class="card">
+        <div class="card-title">Drug Interaction Checker</div>
+        <div class="card-sub">Select medicines you are taking to check for dangerous combinations</div>
+        <div class="interaction-list" id="interactionList"></div>
+        <button class="btn btn-primary btn-full" style="margin-top:14px;" onclick="checkInteraction()">
+          ⚡ Check Interactions
+        </button>
+        <div class="result-box" id="interactionResult"></div>
+      </div>
+    </div>
+
+    <!-- ═══ VOICE SCREEN ═══ -->
+    <div class="screen" id="screen-voice">
+      <div class="card">
+        <div class="card-title">Voice Output</div>
+        <div class="card-sub">Hear medicine details spoken aloud</div>
+
+        <div class="lang-grid">
+          <button class="lang-btn active" onclick="setLang(this,'en-IN')">
+            English<div class="lang-native">English</div>
+          </button>
+          <button class="lang-btn" onclick="setLang(this,'ta-IN')">
+            Tamil<div class="lang-native">தமிழ்</div>
+          </button>
+          <button class="lang-btn" onclick="setLang(this,'hi-IN')">
+            Hindi<div class="lang-native">हिंदी</div>
+          </button>
+          <button class="lang-btn" onclick="setLang(this,'te-IN')">
+            Telugu<div class="lang-native">తెలుగు</div>
+          </button>
+        </div>
+
+        <div class="voice-preview" id="voicePreview">
+          Select a medicine first, then press Play to hear details.
+        </div>
+
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="speakMedicine()">▶ Play</button>
+          <button class="btn btn-outline" onclick="stopSpeaking()">⏹ Stop</button>
+        </div>
+
+        <div class="speaking-indicator" id="speakingIndicator">
+          <div class="speaking-dot"></div>
+          <span>SPEAKING...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ GUARDIAN SCREEN ═══ -->
+    <div class="screen" id="screen-guardian">
+      <div class="card">
+        <div class="card-title">Guardian Alert</div>
+        <div class="card-sub">Send medicine details to a family member or caregiver</div>
+
+        <div class="input-group">
+          <div class="input-label">Guardian Name</div>
+          <input class="med-input" id="gName" placeholder="e.g. Dr. Ravi / Amma / Appa"/>
+        </div>
+        <div class="input-group">
+          <div class="input-label">Guardian Email</div>
+          <input class="med-input" id="gEmail" type="email" placeholder="guardian@email.com"/>
+        </div>
+        <div class="input-group">
+          <div class="input-label">Relation</div>
+          <input class="med-input" id="gRelation" placeholder="e.g. Doctor / Mother / Caregiver"/>
+        </div>
+
+        <div id="alertMedInfo" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:12px;color:var(--text-dim);">Current medicine: <strong id="alertMedName" style="color:var(--teal);">None selected</strong></div>
+        </div>
+
+        <button class="btn btn-primary btn-full" onclick="sendAlert()">
+          🚨 Send Alert
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══ DASHBOARD SCREEN ═══ -->
+    <div class="screen" id="screen-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-num" id="dashScans">0</div>
+          <div class="stat-lbl">Total Scans</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="dashAlerts">0</div>
+          <div class="stat-lbl">Alerts Sent</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="dashBuiltin">20</div>
+          <div class="stat-lbl">Built-in Medicines</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="dashCsv">—</div>
+          <div class="stat-lbl">CSV Medicines</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent Scans</div>
+        <div id="historyList">
+          <div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px;">
+            No scans yet — scan a medicine to see history
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /screens -->
+</div><!-- /app -->
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">LOADING...</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let currentMed  = null;   // the medicine currently being viewed
+let selectedLang = 'en-IN';
+let scanner     = null;
+let scannerOn   = false;
+let selectedForInteraction = [];
+let scanCount   = 0;
+
+// ═══════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════
+function goTab(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  const idx = ['scan','details','interact','voice','guardian','dashboard'].indexOf(name);
+  document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+}
+
+// ═══════════════════════════════════════════════════════
+//  LOADING OVERLAY
+// ═══════════════════════════════════════════════════════
+function showLoading(msg) {
+  document.getElementById('loadingText').textContent = msg || 'LOADING...';
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════════════
+//  LOAD MEDICINE — the main function
+//  Takes an ID like MED001 or a name like "Crocin"
+// ═══════════════════════════════════════════════════════
+async function loadMed(query) {
+  if (!query) return;
+
+  showLoading('SEARCHING...');
+  hideSearch();
+  document.getElementById('notFoundBox').classList.remove('show');
+
+  try {
+    // Ask Flask to find it
+    const res  = await fetch(`/api/medicine/${encodeURIComponent(query)}`);
+    const data = await res.json();
+
+    if (data.error) {
+      // If it looks like a barcode (all digits, 8-14 chars), try barcode API
+      const isBarcode = /^\d{8,14}$/.test(query.trim());
+      if (isBarcode) {
+        showLoading('SCANNING BARCODE...');
+        const res2  = await fetch(`/api/barcode/${query}`);
+        const data2 = await res2.json();
+        if (!data2.error) {
+          hideLoading();
+          showMedicine(data2);
+          return;
+        }
+      }
+      // Not found anywhere
+      hideLoading();
+      document.getElementById('scannedVal').textContent = query;
+      document.getElementById('notFoundBox').classList.add('show');
+      showToast('⚠️ Medicine not found: ' + query);
+      return;
+    }
+
+    hideLoading();
+    showMedicine(data);
+
+  } catch (err) {
+    hideLoading();
+    showToast('❌ Connection error. Is Flask running?');
+    console.error(err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  SHOW MEDICINE — display the medicine details
+// ═══════════════════════════════════════════════════════
+function showMedicine(med) {
+  if (!med || !med.name) {
+    showToast('⚠️ Invalid medicine data');
+    return;
+  }
+
+  currentMed = med;  // save to state
+
+  // Update header scan count
+  scanCount++;
+  document.getElementById('hstatScans').textContent = scanCount;
+  document.getElementById('hstatMeds').textContent = Object.keys(window._allMeds || {}).length || 20;
+
+  // Save to history
+  fetch('/api/save-scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({...med, barcode: 'scan'})
+  }).catch(() => {});
+
+  // Update guardian screen
+  document.getElementById('alertMedName').textContent = med.name;
+
+  // Update voice preview
+  updateVoicePreview();
+
+  // Build details HTML
+  const conf = med.confidence || 85;
+  const typeColor = med.type && med.type.includes('OTC') ? 'badge-green' : 'badge-orange';
+
+  document.getElementById('detailsContent').innerHTML = `
+    <div class="detail-header">
+      <div class="detail-name">${med.name}</div>
+      <div class="detail-brand">${med.brand || ''} ${med.manufacturer ? '· ' + med.manufacturer : ''}</div>
+      <div class="detail-badges">
+        <span class="badge badge-teal">${med.class || 'Medicine'}</span>
+        <span class="badge ${typeColor}">${med.type || 'See packaging'}</span>
+        <span class="badge badge-teal">${conf}% Confidence</span>
+      </div>
+      <div class="confidence-bar" style="margin-top:14px;">
+        <div class="confidence-fill" style="width:${conf}%"></div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-label">Used For</div>
+        <div class="info-box-value">${med.use || '—'}</div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-label">Generic Name</div>
+        <div class="info-box-value">${med.generic || '—'}</div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-label">Dosage</div>
+        <div class="info-box-value">${med.dose || '—'}</div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-label">When to Take</div>
+        <div class="info-box-value">${med.when || '—'}</div>
+      </div>
+      <div class="info-box" style="grid-column:1/-1;">
+        <div class="info-box-label">Side Effects</div>
+        <div class="info-box-value">${med.side || '—'}</div>
+      </div>
+    </div>
+
+    <div class="warning-box">
+      <div class="warning-title">⚠️ IMPORTANT WARNING</div>
+      <div class="warning-text">${med.warning || 'Always consult your doctor before taking this medicine.'}</div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="goTab('voice')">🔊 Voice</button>
+      <button class="btn btn-outline btn-sm" onclick="goTab('guardian')">🛡️ Alert</button>
+      <button class="btn btn-outline btn-sm" onclick="goTab('interact')">⚡ Check Interactions</button>
+    </div>
+  `;
+
+  // Navigate to details
+  goTab('details');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SCANNER
+// ═══════════════════════════════════════════════════════
+async function startScanner() {
+  if (scannerOn) return;
+
+  document.getElementById('scanPlaceholder').style.display = 'none';
+  document.getElementById('scanner-box').classList.add('scanning');
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnStop').style.display = 'inline-flex';
+
+  try {
+    scanner = new Html5Qrcode('qr-reader');
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decoded) => {
+        // SUCCESS — something was scanned
+        console.log('Scanned:', decoded);
+        showToast('✅ Scanned: ' + decoded);
+        stopScanner();
+        loadMed(decoded.trim());
+      },
+      (err) => { /* ignore scan errors, they happen constantly */ }
+    );
+    scannerOn = true;
+  } catch (err) {
+    showToast('❌ Camera error: ' + err);
+    stopScanner();
+  }
+}
+
+function stopScanner() {
+  if (scanner && scannerOn) {
+    scanner.stop().catch(() => {});
+    scannerOn = false;
+  }
+  document.getElementById('btnStart').style.display = 'inline-flex';
+  document.getElementById('btnStop').style.display = 'none';
+  document.getElementById('scanner-box').classList.remove('scanning');
+  document.getElementById('scanPlaceholder').style.display = 'block';
+}
+
+// ═══════════════════════════════════════════════════════
+//  SEARCH
+// ═══════════════════════════════════════════════════════
+let searchTimer = null;
+
+async function onSearch(val) {
+  clearTimeout(searchTimer);
+  if (val.length < 2) { hideSearch(); return; }
+  searchTimer = setTimeout(async () => {
+    try {
+      const res  = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
+      const data = await res.json();
+      showSearchResults(data);
+    } catch (e) {}
+  }, 250);
+}
+
+function showSearchResults(results) {
+  const box = document.getElementById('searchResults');
+  if (!results || results.length === 0) { hideSearch(); return; }
+  box.innerHTML = results.map(m =>
+    `<div class="search-item" onclick="selectSearch('${(m.id||m.name).replace(/'/g,"\\'")}')">
+       <div class="search-item-name">${m.name}</div>
+       <div class="search-item-use">${m.use || ''}</div>
+     </div>`
+  ).join('');
+  box.classList.add('show');
+}
+
+function selectSearch(idOrName) {
+  document.getElementById('searchInput').value = '';
+  hideSearch();
+  loadMed(idOrName);
+}
+
+function hideSearch() {
+  document.getElementById('searchResults').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════════════
+//  MEDICINE PILLS (Quick Select)
+// ═══════════════════════════════════════════════════════
+async function loadPills() {
+  try {
+    const res  = await fetch('/api/all-medicines');
+    const data = await res.json();
+    window._allMeds = data;
+    document.getElementById('hstatMeds').textContent = Object.keys(data).length;
+    document.getElementById('dashBuiltin').textContent = Object.keys(data).length;
+
+    const grid = document.getElementById('pillsGrid');
+    grid.innerHTML = Object.entries(data).map(([id, med]) =>
+      `<div class="pill" onclick="loadMed('${id}')">
+         <div class="pill-name">${med.name}</div>
+         <div class="pill-brand">${(med.brand||'').split('/')[0].trim()}</div>
+       </div>`
+    ).join('');
+  } catch (e) {
+    console.error('Could not load medicines:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  INTERACTION CHECKER
+// ═══════════════════════════════════════════════════════
+async function loadInteractionList() {
+  try {
+    const res  = await fetch('/api/all-medicines');
+    const data = await res.json();
+    const list = document.getElementById('interactionList');
+    list.innerHTML = Object.entries(data).map(([id, med]) =>
+      `<div class="interaction-item" onclick="toggleInteraction(this,'${med.name.replace(/'/g,"\\'")}')">
+         <div class="interaction-check"></div>
+         <div>
+           <div class="interaction-med-name">${med.name}</div>
+           <div class="interaction-med-use">${med.use || ''}</div>
+         </div>
+       </div>`
+    ).join('');
+  } catch (e) {}
+}
+
+function toggleInteraction(el, name) {
+  el.classList.toggle('selected');
+  el.querySelector('.interaction-check').textContent = el.classList.contains('selected') ? '✓' : '';
+  if (el.classList.contains('selected')) {
+    selectedForInteraction.push(name);
+  } else {
+    selectedForInteraction = selectedForInteraction.filter(n => n !== name);
+  }
+}
+
+async function checkInteraction() {
+  if (selectedForInteraction.length < 2) {
+    showToast('⚠️ Select at least 2 medicines to check');
+    return;
+  }
+  try {
+    const res  = await fetch('/api/interaction', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ medicines: selectedForInteraction })
+    });
+    const data = await res.json();
+    const box  = document.getElementById('interactionResult');
+    box.className = `result-box show ${data.level}`;
+    const icons = { safe: '✅', warn: '⚠️', danger: '🚨' };
+    box.innerHTML = `
+      <div class="result-level ${data.level}">${icons[data.level] || '✅'} ${data.level.toUpperCase()}</div>
+      <div class="result-message">${data.message}</div>
+    `;
+  } catch (e) {
+    showToast('❌ Could not check interactions');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  VOICE
+// ═══════════════════════════════════════════════════════
+function setLang(btn, lang) {
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedLang = lang;
+  updateVoicePreview();
+}
+
+function updateVoicePreview() {
+  const m = currentMed;
+  if (!m) {
+    document.getElementById('voicePreview').textContent =
+      'Select a medicine first, then press Play.';
+    return;
+  }
+  const texts = buildVoiceText(m);
+  document.getElementById('voicePreview').textContent = '"' + texts[selectedLang] + '"';
+}
+
+function buildVoiceText(m) {
+  return {
+    'en-IN': `This medicine is ${m.name}. It is used for ${m.use}. Dosage: ${m.dose}, ${m.when}. Side effects: ${m.side}. Warning: ${m.warning}`,
+    'ta-IN': `இந்த மருந்து ${m.name}. இது ${m.use} க்கு பயன்படுகிறது. மருந்தளவு: ${m.dose}, ${m.when}. எச்சரிக்கை: ${m.warning}`,
+    'hi-IN': `यह दवा ${m.name} है। यह ${m.use} के लिए उपयोग होती है। खुराक: ${m.dose}, ${m.when}। चेतावनी: ${m.warning}`,
+    'te-IN': `ఈ మందు ${m.name}. ఇది ${m.use} కోసం వాడతారు. మోతాదు: ${m.dose}, ${m.when}. హెచ్చరిక: ${m.warning}`
+  };
+}
+
+function speakMedicine() {
+  if (!window.speechSynthesis) { showToast('⚠️ Speech not supported — use Chrome'); return; }
+  if (!currentMed) { showToast('⚠️ Select a medicine first'); return; }
+
+  window.speechSynthesis.cancel();
+
+  const texts   = buildVoiceText(currentMed);
+  const text    = texts[selectedLang] || texts['en-IN'];
+  const utt     = new SpeechSynthesisUtterance(text);
+  utt.rate      = 0.88;
+  utt.volume    = 1;
+
+  const voices  = window.speechSynthesis.getVoices();
+  const prefix  = selectedLang.split('-')[0];
+
+  let voice = voices.find(v => v.lang === selectedLang)
+           || voices.find(v => v.lang.startsWith(prefix))
+           || voices.find(v => v.lang.startsWith('en'))
+           || voices[0];
+
+  if (voice) utt.voice = voice;
+  utt.lang = voice ? voice.lang : selectedLang;
+
+  if (!voices.find(v => v.lang.startsWith(prefix)) && selectedLang !== 'en-IN') {
+    showToast(`⚠️ ${getLangName(selectedLang)} voice not installed. Playing in English voice.`);
+  }
+
+  const ind = document.getElementById('speakingIndicator');
+  ind.classList.add('on');
+  utt.onend   = () => ind.classList.remove('on');
+  utt.onerror = () => ind.classList.remove('on');
+
+  window.speechSynthesis.speak(utt);
+}
+
+function stopSpeaking() {
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  document.getElementById('speakingIndicator').classList.remove('on');
+}
+
+function getLangName(code) {
+  return { 'ta-IN':'Tamil','hi-IN':'Hindi','te-IN':'Telugu','en-IN':'English' }[code] || code;
+}
+
+window.speechSynthesis.onvoiceschanged = function() {
+  const voices = window.speechSynthesis.getVoices();
+  ['ta-IN','hi-IN','te-IN'].forEach(lang => {
+    const prefix  = lang.split('-')[0];
+    const found   = voices.find(v => v.lang === lang || v.lang.startsWith(prefix));
+    const btn     = document.querySelector(`[onclick="setLang(this,'${lang}')"]`);
+    if (btn && !found) {
+      const note = btn.querySelector('.lang-native');
+      if (note && !note.textContent.includes('⚠')) note.textContent += ' ⚠️';
+      btn.title = `${getLangName(lang)} voice not installed on this device`;
+    }
+  });
+};
+
+// ═══════════════════════════════════════════════════════
+//  GUARDIAN ALERT
+// ═══════════════════════════════════════════════════════
+async function sendAlert() {
+  const name    = document.getElementById('gName').value.trim();
+  const email   = document.getElementById('gEmail').value.trim();
+  const relation = document.getElementById('gRelation').value.trim();
+
+  if (!name || !email) { showToast('⚠️ Please enter guardian name and email'); return; }
+  if (!currentMed)     { showToast('⚠️ No medicine selected. Scan one first.'); return; }
+
+  showLoading('SENDING ALERT...');
+  try {
+    const res  = await fetch('/api/send-alert', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        guardian_name: name,
+        guardian_email: email,
+        relation: relation || 'Family',
+        medicine: currentMed
+      })
+    });
+    const data = await res.json();
+    hideLoading();
+    showToast(data.message || '✅ Alert sent!');
+  } catch (e) {
+    hideLoading();
+    showToast('❌ Could not send alert');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  DASHBOARD / HISTORY
+// ═══════════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const [histRes, statsRes] = await Promise.all([
+      fetch('/api/history'),
+      fetch('/api/stats')
+    ]);
+    const history = await histRes.json();
+    const stats   = await statsRes.json();
+
+    document.getElementById('dashScans').textContent  = stats.total_scans || 0;
+    document.getElementById('dashAlerts').textContent = stats.total_alerts || 0;
+    document.getElementById('dashBuiltin').textContent = stats.builtin || 20;
+    document.getElementById('dashCsv').textContent    = stats.csv_medicines > 0
+      ? stats.csv_medicines.toLocaleString() : '—';
+
+    document.getElementById('hstatScans').textContent = stats.total_scans || scanCount;
+
+    const list = document.getElementById('historyList');
+    if (!history || history.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px;">No scans yet</div>';
+      return;
+    }
+    list.innerHTML = history.map(h =>
+      `<div class="history-item">
+         <div>
+           <div class="history-name">${h.name || 'Unknown'}</div>
+           <div class="history-meta">${h.use || ''} · ${h.source || ''}</div>
+         </div>
+         <div class="history-time">${(h.time || '').slice(11,16)}<br/><span style="font-size:9px;">${(h.time || '').slice(0,10)}</span></div>
+       </div>`
+    ).join('');
+  } catch (e) {
+    console.error('Dashboard error:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  QR CODE GENERATOR
+// ═══════════════════════════════════════════════════════
+function genQRCodes() {
+  const out = document.getElementById('qrOutput');
+  out.innerHTML = '';
+  if (!window._allMeds) return;
+
+  const entries = Object.entries(window._allMeds).slice(0, 6);
+  entries.forEach(([id, med]) => {
+    const div = document.createElement('div');
+    div.className = 'qr-item';
+    const qDiv = document.createElement('div');
+    qDiv.id = 'qr_' + id;
+    div.appendChild(qDiv);
+    const label = document.createElement('p');
+    label.textContent = med.name.slice(0, 18);
+    div.appendChild(label);
+    out.appendChild(div);
+    new QRCode(qDiv, {
+      text: id,
+      width: 90, height: 90,
+      colorDark: '#000000',
+      colorLight: '#ffffff'
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  SUBMIT UNKNOWN MEDICINE
+// ═══════════════════════════════════════════════════════
+async function submitUnknown() {
+  const barcode = document.getElementById('scannedVal').textContent.trim();
+  const name    = document.getElementById('subName').value.trim();
+  if (!name) { showToast('⚠️ Enter medicine name'); return; }
+
+  try {
+    const res  = await fetch('/api/submit-medicine', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        barcode: barcode,
+        name:    name,
+        brand:   document.getElementById('subBrand').value.trim(),
+        use:     document.getElementById('subUse').value.trim(),
+        dose:    document.getElementById('subDose').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Added! Loading now...');
+      document.getElementById('notFoundBox').classList.remove('show');
+      setTimeout(() => loadMed(barcode), 600);
+    } else {
+      showToast('❌ ' + (data.error || 'Could not save'));
+    }
+  } catch (e) {
+    showToast('❌ Error saving medicine');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadPills();
+  loadInteractionList();
+});
+</script>
+</body>
+</html>
